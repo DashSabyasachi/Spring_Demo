@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Employee Management System</title>
+<style>
+  :root {
+    --bg: #e8ebe4; --body: #2f3b36; --screen: #cfe0c3; --ink: #1d2a22;
+    --key: #f4f5f0; --key-ink: #2f3b36; --op: #d9822b; --op-ink: #fff;
+    --err: #b3261e; --danger: #b3261e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: start center; padding: 24px 16px;
+    background: var(--bg); font-family: "Trebuchet MS", "Segoe UI", sans-serif; color: var(--ink);
+  }
+  .card {
+    width: 100%; max-width: 640px; background: var(--body); border-radius: 22px; padding: 24px;
+    box-shadow: 0 18px 40px rgba(0,0,0,.25); color: #e8ebe4;
+  }
+  h1 { margin: 0 0 4px; font-size: 22px; color: #fff; }
+  .sub { margin: 0 0 18px; font-size: 13px; color: #c9d3cc; }
+  .status { min-height: 18px; font-size: 13px; margin-bottom: 12px; color: var(--err); }
+  .fields { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  label { color: #c9d3cc; font-size: 13px; display: grid; gap: 4px; }
+  input {
+    width: 100%; font: inherit; font-size: 16px; padding: 10px; border: 2px solid transparent;
+    border-radius: 8px; background: var(--key); color: var(--ink);
+  }
+  input:focus { outline: none; border-color: var(--op); }
+  .actions { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  button {
+    font: inherit; font-size: 15px; font-weight: 700; padding: 10px 16px; border: 0; border-radius: 8px;
+    background: var(--op); color: var(--op-ink); cursor: pointer; box-shadow: 0 3px 0 #9c5d1c;
+  }
+  button:active { transform: translateY(2px); box-shadow: 0 1px 0 #9c5d1c; }
+  button.secondary { background: var(--key); color: var(--key-ink); box-shadow: 0 3px 0 #a9ada3; }
+  table { width: 100%; border-collapse: collapse; background: var(--screen); border-radius: 10px; overflow: hidden; }
+  th, td { padding: 10px 12px; text-align: left; font-size: 14px; color: var(--ink); }
+  th { background: #bcd0ac; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  tr:not(:last-child) td { border-bottom: 1px solid #b7c8a9; }
+  .del-btn {
+    background: var(--danger); color: #fff; padding: 6px 10px; font-size: 13px; box-shadow: 0 2px 0 #7c1a15;
+  }
+  .empty { padding: 16px; text-align: center; color: #4a5750; font-size: 14px; }
+  .search-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: end; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<main class="card">
+  <h1>Employee Management System</h1>
+  <p class="sub">Enter an ID, name and salary to add an employee. Data lives in memory and resets when the server restarts.</p>
+
+  <div class="status" id="status"></div>
+
+  <div class="fields">
+    <label>Employee ID <input id="id" type="number" placeholder="e.g. 1"></label>
+    <label>Employee Name <input id="name" type="text" placeholder="e.g. Priya Sharma"></label>
+    <label>Employee Salary <input id="salary" type="number" step="any" placeholder="e.g. 45000"></label>
+  </div>
+  <div class="actions">
+    <button id="addBtn">Add Employee</button>
+    <button class="secondary" id="showAllBtn">Show All</button>
+  </div>
+
+  <div class="search-row">
+    <label>Search by ID <input id="searchId" type="number" placeholder="e.g. 1"></label>
+    <button class="secondary" id="searchBtn">Search</button>
+    <button class="secondary" id="clearSearchBtn">Clear</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Name</th><th>Salary</th><th></th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const statusEl = $("status"), rowsEl = $("rows");
+
+  function setStatus(msg, isError) {
+    statusEl.textContent = msg || "";
+    statusEl.style.color = isError ? "#ff8a80" : "#c9d3cc";
+  }
+
+  function renderRows(list) {
+    rowsEl.innerHTML = "";
+    if (!list || list.length === 0) {
+      rowsEl.innerHTML = `<tr><td colspan="4" class="empty">No employees to show.</td></tr>`;
+      return;
+    }
+    list.forEach(emp => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${emp.id}</td>
+        <td>${emp.name}</td>
+        <td>${emp.salary}</td>
+        <td><button class="del-btn" data-id="${emp.id}">Delete</button></td>
+      `;
+      rowsEl.appendChild(tr);
+    });
+    rowsEl.querySelectorAll(".del-btn").forEach(btn =>
+      btn.addEventListener("click", () => deleteEmployee(btn.dataset.id)));
+  }
+
+  async function loadAll() {
+    try {
+      const res = await fetch("/employees");
+      if (!res.ok) throw new Error("Server returned " + res.status);
+      renderRows(await res.json());
+      setStatus("");
+    } catch (e) {
+      setStatus("Can't reach the server. Is the app running?", true);
+    }
+  }
+
+  async function addEmployee() {
+    const id = $("id").value;
+    const name = $("name").value.trim();
+    const salary = $("salary").value;
+    if (id === "" || !name || salary === "") return setStatus("Enter an ID, name and salary.", true);
+
+    try {
+      const res = await fetch("/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: Number(id), name, salary: Number(salary) })
+      });
+      if (!res.ok) throw new Error("Server returned " + res.status);
+      $("id").value = ""; $("name").value = ""; $("salary").value = "";
+      setStatus("Employee added.");
+      loadAll();
+    } catch (e) {
+      setStatus("Couldn't add employee. Is the app running?", true);
+    }
+  }
+
+  async function searchEmployee() {
+    const id = $("searchId").value;
+    if (id === "") return setStatus("Enter an ID to search.", true);
+
+    try {
+      const res = await fetch(`/employees/${id}`);
+      if (!res.ok) throw new Error("Server returned " + res.status);
+      const emp = await res.json();
+      if (emp === null) {
+        setStatus(`Employee with ID ${id} not found.`, true);
+        renderRows([]);
+      } else {
+        setStatus("");
+        renderRows([emp]);
+      }
+    } catch (e) {
+      setStatus("Couldn't search. Is the app running?", true);
+    }
+  }
+
+  async function deleteEmployee(id) {
+    try {
+      const res = await fetch(`/employees/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Server returned " + res.status);
+      setStatus(`Deleted employee ${id}.`);
+      loadAll();
+    } catch (e) {
+      setStatus("Couldn't delete. Is the app running?", true);
+    }
+  }
+
+  $("addBtn").addEventListener("click", addEmployee);
+  $("searchBtn").addEventListener("click", searchEmployee);
+  $("showAllBtn").addEventListener("click", () => { $("searchId").value = ""; loadAll(); });
+  $("clearSearchBtn").addEventListener("click", () => { $("searchId").value = ""; loadAll(); });
+
+  loadAll();
+</script>
+</body>
+</html>
