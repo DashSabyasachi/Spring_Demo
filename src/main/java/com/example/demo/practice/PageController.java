@@ -13,6 +13,6 @@ public class PageController {
 
     @GetMapping("/employee-management")
     public String employeeManagement() {
-        return "forward:/employee-management.html";
+        return "forward:/employee.html";
     }
 }
