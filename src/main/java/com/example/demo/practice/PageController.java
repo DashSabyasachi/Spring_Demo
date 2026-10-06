@@ -9,7 +9,7 @@ public class PageController {
     @GetMapping("/calculator")
     public String calculator() {
         return "forward:/calculator.html";
-    }
+    } 
 
     @GetMapping("/employee-management")
     public String employeeManagement() {
