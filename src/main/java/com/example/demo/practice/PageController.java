@@ -16,8 +16,4 @@ public class PageController {
         return "forward:/employee.html";
     }
     
-//    @GetMapping("/new-page")
-//    public String new-page() {
-//        return "forward:/new-page.html";
-//    }
 }
